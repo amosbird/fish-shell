@@ -1,4 +1,4 @@
-set -l systemd_version (systemctl --version | string match "systemd*" | string replace -r "\D*(\d+)"  '$1')
+set -l systemd_version (systemctl --version | string match "*systemd*" | string replace -r "\D*(\d+)"  '$1')
 set -l commands list-units list-sockets start stop reload restart try-restart reload-or-restart reload-or-try-restart \
 	isolate kill is-active is-failed status show get-cgroup-attr set-cgroup-attr unset-cgroup-attr set-cgroup help \
 	reset-failed list-unit-files enable disable is-enabled reenable preset mask unmask link load list-jobs cancel dump \
