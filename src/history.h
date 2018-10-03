@@ -171,6 +171,8 @@ class history_t {
     // Saves history.
     void save();
 
+    bool token_list(long max_items, bool null_terminate, bool ignore_first, io_streams_t &streams);
+
     // Searches history.
     bool search(history_search_type_t search_type, const wcstring_list_t &search_args,
                 const wchar_t *show_time_format, size_t max_items, bool case_sensitive,

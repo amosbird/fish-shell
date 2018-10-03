@@ -28,6 +28,7 @@
 #include <random>
 #include <type_traits>
 #include <unordered_set>
+#include <vector>
 
 #include "common.h"
 #include "env.h"
@@ -364,6 +365,8 @@ struct history_impl_t {
 
     // Return the number of history entries.
     size_t size();
+
+    bool token_list(long max_items, bool null_terminate, bool ignore_first, io_streams_t &streams);
 };
 
 void history_impl_t::add(const history_item_t &item, bool pending, bool do_save) {
@@ -1005,6 +1008,31 @@ static void format_history_record(const history_item_t &item, const wchar_t *sho
     result->push_back(null_terminate ? L'\0' : L'\n');
 }
 
+bool history_impl_t::token_list(long max_items, bool null_terminate,
+                                bool ignore_first, io_streams_t &streams) {
+    // Start at one because zero is the current command.
+    for (int i = 1; !this->item_at_index(i).empty() && max_items; ++i, --max_items) {
+        auto item = this->item_at_index(i);
+        tokenizer_t tok(item.str().c_str(), TOK_ACCEPT_UNFINISHED);
+        maybe_t<tok_t> token{};
+        std::vector<wcstring> ss;
+        while ((token = tok.next())) {
+            if (token->type == token_type_t::string) {
+                if (null_terminate) {
+                  ss.push_back(tok.text_of(*token) + L'\0');
+                } else {
+                  ss.push_back(tok.text_of(*token) + L'\n');
+                }
+            }
+        }
+        for (int i = ss.size() - 1; i >= 1; --i) {
+            streams.out.append(ss[i]);
+        }
+        if (!ss.empty() && !ignore_first) streams.out.append(ss[0]);
+    }
+    return true;
+}
+
 void history_impl_t::disable_automatic_saving() {
     disable_automatic_save_counter++;
     assert(disable_automatic_save_counter != 0);  // overflow!
@@ -1423,6 +1451,11 @@ std::unordered_map<long, wcstring> history_t::items_at_indexes(const std::vector
 history_item_t history_t::item_at_index(size_t idx) { return impl()->item_at_index(idx); }
 
 size_t history_t::size() { return impl()->size(); }
+
+bool history_t::token_list(long max_items, bool null_terminate,
+                           bool ignore_first, io_streams_t &streams) {
+    return impl()->token_list(max_items, null_terminate, ignore_first, streams);
+}
 
 /// The set of all histories.
 static owning_lock<std::map<wcstring, std::unique_ptr<history_t>>> s_histories;

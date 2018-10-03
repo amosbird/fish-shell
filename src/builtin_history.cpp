@@ -293,6 +293,7 @@ int builtin_history(parser_t &parser, io_streams_t &streams, wchar_t **argv) {
             }
 
             history->incorporate_external_changes();
+            reader_update_autosuggestion();
             break;
         }
         case HIST_SAVE: {

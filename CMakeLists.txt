@@ -175,7 +175,7 @@ endfunction(FISH_LINK_DEPS_AND_SIGN)
 # Define libfish.a.
 add_library(fishlib STATIC ${FISH_SRCS})
 target_sources(fishlib PRIVATE ${FISH_HEADERS})
-target_link_libraries(fishlib
+target_link_libraries(fishlib -ltinfo
   ${CURSES_LIBRARY} ${CURSES_EXTRA_LIBRARY} Threads::Threads ${CMAKE_DL_LIBS}
   ${PCRE2_LIB} ${Intl_LIBRARIES} ${ATOMIC_LIBRARY})
 

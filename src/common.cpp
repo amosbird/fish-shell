@@ -98,16 +98,7 @@ static relaxed_atomic_t<pid_t> initial_fg_process_group{-1};
 static char *wcs2str_internal(const wchar_t *in, char *out);
 static void debug_shared(wchar_t msg_level, const wcstring &msg);
 
-#if defined(OS_IS_CYGWIN) || defined(WSL)
-// MS Windows tty devices do not currently have either a read or write timestamp. Those
-// respective fields of `struct stat` are always the current time. Which means we can't
-// use them. So we assume no external program has written to the terminal behind our
-// back. This makes multiline promptusable. See issue #2859 and
-// https://github.com/Microsoft/BashOnWindows/issues/545
 const bool has_working_tty_timestamps = false;
-#else
-const bool has_working_tty_timestamps = true;
-#endif
 
 /// Convert a character to its integer equivalent if it is a valid character for the requested base.
 /// Return the integer value if it is valid else -1.

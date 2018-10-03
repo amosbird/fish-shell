@@ -25,10 +25,12 @@
 #include "common.h"
 #include "fallback.h"  // IWYU pragma: keep
 #include "future_feature_flags.h"
+#include "history.h"
 #include "io.h"
 #include "parse_util.h"
 #include "pcre2.h"
 #include "wcstringutil.h"
+#include "reader.h"
 #include "wgetopt.h"
 #include "wildcard.h"
 #include "wutil.h"  // IWYU pragma: keep
@@ -1305,6 +1307,7 @@ static int string_sub(parser_t &parser, io_streams_t &streams, int argc, wchar_t
     opts.quiet_valid = true;
     opts.start_valid = true;
     opts.end_valid = true;
+    opts.no_newline_valid = true;
     opts.length = -1;
     int optind;
     int retval = parse_opts(&opts, &optind, 0, argc, argv, parser, streams);
@@ -1352,7 +1355,8 @@ static int string_sub(parser_t &parser, io_streams_t &streams, int argc, wchar_t
         // Note that std::string permits count to extend past end of string.
         if (!opts.quiet) {
             streams.out.append(s->substr(pos, count));
-            streams.out.append(L'\n');
+            if (!opts.no_newline)
+                streams.out.append(L'\n');
         }
         nsub++;
     }
@@ -1366,6 +1370,7 @@ static int string_trim(parser_t &parser, io_streams_t &streams, int argc, wchar_
     opts.left_valid = true;
     opts.right_valid = true;
     opts.quiet_valid = true;
+    opts.no_newline_valid = true;
     int optind;
     int retval = parse_opts(&opts, &optind, 0, argc, argv, parser, streams);
     if (retval != STATUS_CMD_OK) return retval;
@@ -1394,11 +1399,68 @@ static int string_trim(parser_t &parser, io_streams_t &streams, int argc, wchar_
         ntrim += arg->size() - (end - begin);
         if (!opts.quiet) {
             streams.out.append(wcstring(*arg, begin, end - begin));
-            streams.out.append(L'\n');
+            if (!opts.no_newline)
+                streams.out.append(L'\n');
         }
     }
 
     return ntrim > 0 ? STATUS_CMD_OK : STATUS_CMD_ERROR;
+}
+
+static int string_tok(parser_t &parser, io_streams_t &streams, int argc, wchar_t **argv) {
+    const wchar_t *short_options = L":n:za";
+    const struct woption long_options[] = {{L"max", required_argument, NULL, 'n'},
+                                           {L"null", no_argument, 0, 'z'},
+                                           {L"arguments", no_argument, 0, 'a'},
+                                           {0, 0, 0, 0}};
+    long max_items = LONG_MAX;
+    bool null_terminate = false;
+    bool ignore_first = false;
+    wgetopter_t w;
+    for (;;) {
+        int c = w.wgetopt_long(argc, argv, short_options, long_options, 0);
+
+        if (c == -1) {
+            break;
+        }
+        switch (c) {
+            case 'a': {
+                ignore_first = true;
+                break;
+            }
+            case 'n': {
+                max_items = fish_wcstol(w.woptarg);
+                if (errno) {
+                    streams.err.append_format(_(L"%ls: max value '%ls' is not a valid number\n"),
+                                              argv[0], w.woptarg);
+                    return STATUS_CMD_ERROR;
+                }
+                break;
+            }
+            case 'z': {
+                null_terminate = true;
+                break;
+            }
+            case ':': {
+                string_error(streams, BUILTIN_ERR_MISSING, argv[0]);
+                return STATUS_CMD_ERROR;
+            }
+            case '?': {
+                string_unknown_option(parser, streams, argv[0], argv[w.woptind - 1]);
+                return STATUS_CMD_ERROR;
+            }
+            default: {
+                DIE("unexpected opt");
+                break;
+            }
+        }
+    }
+    history_t *history = reader_get_history();
+    if (!history) history = &history_t::history_with_name(L"fish");
+    if (!history->token_list(max_items, null_terminate, ignore_first, streams)) {
+        return STATUS_CMD_ERROR;
+    }
+    return STATUS_CMD_OK;
 }
 
 // A helper function for lower and upper.
@@ -1447,7 +1509,7 @@ string_subcommands[] = {
     {L"split", &string_split},   {L"split0", &string_split0},     {L"sub", &string_sub},
     {L"trim", &string_trim},     {L"lower", &string_lower},       {L"upper", &string_upper},
     {L"repeat", &string_repeat}, {L"unescape", &string_unescape}, {L"collect", &string_collect},
-    {nullptr, nullptr}};
+    {L"tokenize", &string_tok}, {nullptr, nullptr}};
 
 /// The string builtin, for manipulating strings.
 int builtin_string(parser_t &parser, io_streams_t &streams, wchar_t **argv) {

@@ -145,7 +145,9 @@ int builtin_commandline(parser_t &parser, io_streams_t &streams, wchar_t **argv)
     int line_mode = 0;
     int search_mode = 0;
     int paging_mode = 0;
-    const wchar_t *begin = nullptr, *end = nullptr;
+    const wchar_t *begin = NULL, *end = NULL;
+
+    int with_suggestion = 0;
 
     const auto &ld = parser.libdata();
     wcstring transient_commandline;
@@ -189,6 +191,7 @@ int builtin_commandline(parser_t &parser, io_streams_t &streams, wchar_t **argv)
                                                   {L"line", no_argument, nullptr, 'L'},
                                                   {L"search-mode", no_argument, nullptr, 'S'},
                                                   {L"paging-mode", no_argument, nullptr, 'P'},
+                                                  {L"with-suggestion", no_argument, NULL, 'A'},
                                                   {nullptr, 0, nullptr, 0}};
 
     int opt;
@@ -260,6 +263,10 @@ int builtin_commandline(parser_t &parser, io_streams_t &streams, wchar_t **argv)
                 paging_mode = 1;
                 break;
             }
+            case 'A': {
+                with_suggestion = 1;
+                break;
+            }
             case 'h': {
                 builtin_print_help(parser, streams, cmd);
                 return STATUS_CMD_OK;
@@ -276,6 +283,12 @@ int builtin_commandline(parser_t &parser, io_streams_t &streams, wchar_t **argv)
                 DIE("unexpected retval from wgetopt_long");
             }
         }
+    }
+
+    if (with_suggestion) {
+        auto c = reader_get_autosuggestion();
+        if (c) streams.out.append_format(L"%ls", c);
+        return STATUS_CMD_OK;
     }
 
     if (function_mode) {

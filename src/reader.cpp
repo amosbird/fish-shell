@@ -119,6 +119,18 @@ static constexpr size_t READAHEAD_MAX = 256;
 /// current contents of the kill buffer.
 #define KILL_PREPEND 1
 
+enum class history_search_mode_t {
+    none,  // no search
+    line,  // searching by line
+    token  // searching by token
+};
+
+enum class accept_autosuggestion_t {
+    character,
+    word,
+    full
+};
+
 enum class history_search_direction_t { forward, backward };
 
 enum class jump_direction_t { forward, backward };
@@ -602,7 +614,7 @@ class reader_data_t : public std::enable_shared_from_this<reader_data_t> {
     bool can_autosuggest() const;
     void autosuggest_completed(autosuggestion_result_t result);
     void update_autosuggestion();
-    void accept_autosuggestion(bool full, move_word_style_t style = move_word_style_punctuation);
+    void accept_autosuggestion(accept_autosuggestion_t type, move_word_style_t style = move_word_style_punctuation);
     void super_highlight_me_plenty(int highlight_pos_adjust = 0, bool no_io = false);
 
     void highlight_search();
@@ -1548,16 +1560,16 @@ void reader_data_t::update_autosuggestion() {
 
 // Accept any autosuggestion by replacing the command line with it. If full is true, take the whole
 // thing; if it's false, then respect the passed in style.
-void reader_data_t::accept_autosuggestion(bool full, move_word_style_t style) {
+void reader_data_t::accept_autosuggestion(accept_autosuggestion_t type, move_word_style_t style) {
     if (!autosuggestion.empty()) {
         // Accepting an autosuggestion clears the pager.
         clear_pager();
 
         // Accept the autosuggestion.
-        if (full) {
+        if (type == accept_autosuggestion_t::full) {
             // Just take the whole thing.
             command_line.replace_substring(0, command_line.size(), std::move(autosuggestion));
-        } else {
+        } else if (type == accept_autosuggestion_t::word) {
             // Accept characters according to the specified style.
             move_word_state_machine_t state(style);
             size_t want;
@@ -1568,6 +1580,10 @@ void reader_data_t::accept_autosuggestion(bool full, move_word_style_t style) {
             size_t have = command_line.size();
             command_line.replace_substring(command_line.size(), 0,
                                            autosuggestion.substr(have, want - have));
+        } else {
+            size_t have = command_line.size();
+            command_line.replace_substring(command_line.size(), 0,
+                                           autosuggestion.substr(have, 1));
         }
         update_buff_pos(&command_line);
         command_line_changed(&command_line);
@@ -2659,7 +2675,7 @@ void reader_data_t::handle_readline_command(readline_cmd_t c, readline_loop_stat
                     update_buff_pos(el, el->position() + 1);
                 }
             } else {
-                accept_autosuggestion(true);
+                accept_autosuggestion(accept_autosuggestion_t::full);
             }
 
             mark_repaint_needed();
@@ -3062,7 +3078,7 @@ void reader_data_t::handle_readline_command(readline_cmd_t c, readline_loop_stat
                 update_buff_pos(el, el->position() + 1);
                 mark_repaint_needed();
             } else {
-                accept_autosuggestion(true);
+                accept_autosuggestion(accept_autosuggestion_t::character);
             }
             break;
         }
@@ -3107,7 +3123,7 @@ void reader_data_t::handle_readline_command(readline_cmd_t c, readline_loop_stat
             if (el->position() < el->size()) {
                 move_word(el, MOVE_DIR_RIGHT, false /* do not erase */, move_style, false);
             } else {
-                accept_autosuggestion(false, move_style);
+                accept_autosuggestion(accept_autosuggestion_t::word, move_style);
             }
             break;
         }
@@ -3197,7 +3213,7 @@ void reader_data_t::handle_readline_command(readline_cmd_t c, readline_loop_stat
             break;
         }
         case rl::accept_autosuggestion: {
-            accept_autosuggestion(true);
+            accept_autosuggestion(accept_autosuggestion_t::full);
             break;
         }
         case rl::transpose_chars: {
@@ -3759,6 +3775,19 @@ history_t *reader_get_history() {
     ASSERT_IS_MAIN_THREAD();
     reader_data_t *data = current_data_or_null();
     return data ? data->history : nullptr;
+}
+
+const wchar_t *reader_get_autosuggestion() {
+    ASSERT_IS_MAIN_THREAD();
+    reader_data_t *data = current_data_or_null();
+    return data && !data->autosuggestion.empty() ? data->autosuggestion.c_str() : NULL;
+}
+
+void reader_update_autosuggestion() {
+    ASSERT_IS_MAIN_THREAD();
+    reader_data_t *data = current_data_or_null();
+    if (!data) return;
+    data->update_autosuggestion();
 }
 
 void reader_sanity_check() {
