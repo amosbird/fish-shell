@@ -94,7 +94,7 @@ static relaxed_atomic_t<pid_t> initial_fg_process_group{-1};
 // https://github.com/Microsoft/BashOnWindows/issues/545
 const bool has_working_tty_timestamps = false;
 #else
-const bool has_working_tty_timestamps = true;
+const bool has_working_tty_timestamps = false;
 #endif
 
 /// Convert a character to its integer equivalent if it is a valid character for the requested base.
