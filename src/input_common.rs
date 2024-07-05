@@ -460,7 +460,6 @@ impl TerminalProtocols {
         let sequences = concat!(
             "\x1b[?2004h", // Bracketed paste
             "\x1b[>4;1m",  // XTerm's modifyOtherKeys
-            "\x1b[>5u",    // CSI u with kitty progressive enhancement
             "\x1b=",       // set application keypad mode, so the keypad keys send unique codes
         );
         FLOG!(
@@ -484,7 +483,6 @@ impl Drop for TerminalProtocols {
         let sequences = concat!(
             "\x1b[?2004l",
             "\x1b[>4;0m",
-            "\x1b[<1u", // Konsole breaks unless we pass an explicit number of entries to pop.
             "\x1b>",
         );
         FLOG!(
